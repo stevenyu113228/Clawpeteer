@@ -31,13 +31,9 @@ type Config struct {
 	LogDir            string         `json:"logDir,omitempty"`
 }
 
-func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config: %w", err)
-	}
-
-	cfg := &Config{
+// Defaults returns a Config with default values applied.
+func Defaults() *Config {
+	return &Config{
 		HeartbeatInterval: 30,
 		Security: SecurityConfig{
 			Mode:            "blacklist",
@@ -45,17 +41,35 @@ func Load(path string) (*Config, error) {
 			MaxConcTransfer: 3,
 		},
 	}
+}
+
+// Load reads and parses a config file from disk.
+func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read config: %w", err)
+	}
+	return Parse(data)
+}
+
+// Parse parses config from raw JSON bytes.
+func Parse(data []byte) (*Config, error) {
+	cfg := Defaults()
 
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	if cfg.AgentID == "" {
-		return nil, fmt.Errorf("agentId is required")
-	}
-	if cfg.Broker.URL == "" {
-		return nil, fmt.Errorf("broker.url is required")
-	}
-
 	return cfg, nil
+}
+
+// Validate checks that required fields are present.
+func (c *Config) Validate() error {
+	if c.AgentID == "" {
+		return fmt.Errorf("agentId is required (use --id or config)")
+	}
+	if c.Broker.URL == "" {
+		return fmt.Errorf("broker url is required (use --broker or config)")
+	}
+	return nil
 }

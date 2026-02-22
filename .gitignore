@@ -15,3 +15,6 @@ agent/clawpeteer-agent
 # Embedded CA certs (sensitive, don't commit)
 agent/certs/*.crt
 agent/certs/*.pem
+
+# Embedded config (sensitive, don't commit)
+agent/buildcfg/config.json
