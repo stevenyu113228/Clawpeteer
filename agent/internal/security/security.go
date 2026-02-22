@@ -110,7 +110,8 @@ func (v *Validator) ValidateDownloadPath(srcPath string) error {
 // directories. This prevents path traversal attacks.
 func (v *Validator) validatePath(path string, allowedDirs []string, operation string) error {
 	if len(allowedDirs) == 0 {
-		return fmt.Errorf("no %s directories configured", operation)
+		// No restrictions configured — allow all paths
+		return nil
 	}
 
 	// Clean and resolve to absolute path
