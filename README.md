@@ -65,8 +65,13 @@ The installer automatically sets up the CLI, MQTT config, CA certificate, and Op
      "brokerUrl": "mqtts://your.broker.host:8883",
      "username": "my-agent",
      "password": "my-secret",
+     "clientId": "my-client-id",
      "caFile": "/path/to/ca.crt"
    }
+   ```
+   You can also pass `--config <path>` before any subcommand:
+   ```bash
+   clawpeteer --config /path/to/config.json list
    ```
 
 4. **Build and run an agent on a remote machine** (see [docs/install-agent.md](docs/install-agent.md)):
@@ -85,7 +90,7 @@ The installer automatically sets up the CLI, MQTT config, CA certificate, and Op
 
 ## Agent Configuration
 
-The agent supports three ways to configure, with the following priority (highest first):
+The agent loads config from multiple sources, with the following priority (highest first):
 
 | Priority | Method | Description |
 |----------|--------|-------------|
@@ -122,11 +127,16 @@ The resulting binary runs with no external files:
 ./clawpeteer-agent --id override-name       # override specific fields
 ```
 
-### Cross-compile for Windows
+### Cross-compile
 
 ```bash
 cd agent
+
+# Windows
 GOOS=windows GOARCH=amd64 go build -o clawpeteer-agent.exe .
+
+# Linux
+GOOS=linux GOARCH=amd64 go build -o clawpeteer-agent-linux .
 ```
 
 ## Documentation
