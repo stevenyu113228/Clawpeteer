@@ -28,6 +28,8 @@ Examples:
 - `clawpeteer send office "npm install" --background`
 - `clawpeteer send home-pc "df -h"` (check disk space)
 - `clawpeteer send server "free -h"` (check memory)
+- `clawpeteer send win-pc "dir C:\\Users"` (list windows dir)
+- `clawpeteer send mac-book "sw_vers"` (check macOS version)
 
 ### Upload a file to a remote machine
 
@@ -38,6 +40,7 @@ clawpeteer upload <agent-id> <local-path> <remote-path>
 Examples:
 - `clawpeteer upload home-pc ./backup.tar.gz /home/user/backups/backup.tar.gz`
 - `clawpeteer upload server ./config.json /etc/app/config.json`
+- `clawpeteer upload win-pc ./tool.exe "C:\\Tools\\tool.exe"`
 
 ### Download a file from a remote machine
 
@@ -46,8 +49,8 @@ clawpeteer download <agent-id> <remote-path> [local-path]
 ```
 
 Examples:
-- `clawpeteer download server /var/log/app.log ./logs/`
-- `clawpeteer download home-pc /home/user/data.db ./backups/data.db`
+- `clawpeteer download server /var/log/app.log ./logs/app.log`
+- `clawpeteer download win-pc "C:\\Users\\User\\Desktop\\file.txt" ./downloads/file.txt`
 
 ### List connected agents
 
@@ -66,6 +69,22 @@ clawpeteer status <agent-id> [task-id]
 ```bash
 clawpeteer kill <agent-id> <task-id>
 ```
+
+## Best Practices & Tips
+
+### Path Handling
+- **Use absolute paths:** Especially on Windows, environment variables like `%USERPROFILE%` or `~` may not be expanded automatically by the agent.
+- **Check before transfer:** Use `ls` or `dir` to verify file existence before uploading/downloading.
+- **Download destination:** The local path for `download` must include the filename (e.g., `./downloads/file.txt`, not just `./downloads/`).
+
+### Windows Agents
+- Use `dir` instead of `ls` (unless PowerShell is default).
+- Use backslashes `\` or double backslashes `\\` in paths if needed, though forward slashes `/` often work in Node.js.
+- Path example: `C:\Users\Administrator\Desktop\file.txt`
+
+### File Transfer
+- **Timeout?** If a download hangs, check if the file path is correct on the remote machine. The agent might be failing silently on file access errors.
+- **Large files:** Transfers are chunked (256KB). Progress will be shown.
 
 ## User Intent Mapping
 
