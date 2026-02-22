@@ -15,6 +15,9 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 	"github.com/stevenmeow/clawpeteer-agent/internal/config"
+	"github.com/stevenmeow/clawpeteer-agent/internal/handler"
+	"github.com/stevenmeow/clawpeteer-agent/internal/security"
+	"github.com/stevenmeow/clawpeteer-agent/internal/taskmanager"
 )
 
 func main() {
@@ -85,6 +88,13 @@ func main() {
 		log.Fatalf("Failed to connect to MQTT broker: %v", err)
 	}
 
+	// Wire handler, security, and task manager
+	secValidator := security.New(cfg.Security.Mode, cfg.Security.Whitelist, cfg.Security.Blacklist, cfg.Security.UploadDirs, cfg.Security.DownloadDirs)
+	tasks := taskmanager.New()
+	h := handler.New(cfg.AgentID, client, tasks, secValidator)
+	h.Subscribe()
+	h.StartHeartbeat(time.Duration(cfg.HeartbeatInterval) * time.Second)
+
 	log.Println("Agent is running. Press Ctrl+C to stop.")
 
 	// Wait for shutdown signal
@@ -93,6 +103,8 @@ func main() {
 	sig := <-sigCh
 
 	log.Printf("Received signal %v, shutting down...", sig)
+
+	h.StopHeartbeat()
 
 	// Publish offline status before disconnecting
 	statusTopic := fmt.Sprintf("clawpeteer/%s/status", cfg.AgentID)
