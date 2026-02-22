@@ -14,6 +14,7 @@ export class MQTTClient extends EventEmitter {
       const options = {
         username: this.config.username,
         password: this.config.password,
+        clientId: this.config.clientId || undefined,
         clean: true,
         connectTimeout: 10000,
       };

@@ -43,12 +43,12 @@ export async function uploadFile(mqtt, agentId, localPath, remotePath, onProgres
   // Subscribe to file status
   await mqtt.subscribe(`agents/${agentId}/files/status`);
 
-  // Publish metadata
+  // Publish metadata (field names must match Agent's UploadMeta struct)
   const meta = {
     transferId,
-    fileName,
-    remotePath,
-    fileSize,
+    filename: fileName,
+    destPath: remotePath,
+    size: fileSize,
     totalChunks,
     chunkSize: CHUNK_SIZE,
     sha256,
@@ -167,7 +167,7 @@ export async function downloadFile(mqtt, agentId, remotePath, localPath, onProgr
         // Determine output path
         let outputPath = localPath;
         if (!outputPath) {
-          outputPath = join(process.cwd(), meta.fileName || basename(remotePath));
+          outputPath = join(process.cwd(), meta.filename || basename(remotePath));
         }
 
         // Write file
@@ -198,11 +198,11 @@ export async function downloadFile(mqtt, agentId, remotePath, localPath, onProgr
 
     mqtt.on('message', handler);
 
-    // Send file download command to agent
+    // Send file download command to agent (sourcePath matches Agent's Command struct)
     const downloadCommand = {
       id: transferId,
       type: 'file_download',
-      remotePath,
+      sourcePath: remotePath,
       transferId,
       timestamp: Date.now(),
     };
