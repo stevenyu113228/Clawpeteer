@@ -66,7 +66,7 @@ export function registerSendCommand(program) {
         // Wait for final result
         const result = await mqtt.waitForMessage(
           `agents/${agent}/results`,
-          (msg) => msg.id === taskId && msg.status !== 'started',
+          (msg) => msg.taskId === taskId && msg.status !== 'started',
           timeoutMs + 5000
         );
 

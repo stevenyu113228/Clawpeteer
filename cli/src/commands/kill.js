@@ -34,7 +34,7 @@ export function registerKillCommand(program) {
         // Wait for kill confirmation
         const result = await mqtt.waitForMessage(
           `agents/${agent}/results`,
-          (msg) => msg.id === taskId && msg.status === 'killed',
+          (msg) => msg.taskId === taskId && msg.status === 'killed',
           timeoutMs
         );
 
