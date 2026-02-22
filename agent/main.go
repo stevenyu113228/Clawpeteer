@@ -14,6 +14,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
+	"github.com/stevenmeow/clawpeteer-agent/certs"
 	"github.com/stevenmeow/clawpeteer-agent/internal/config"
 	"github.com/stevenmeow/clawpeteer-agent/internal/handler"
 	"github.com/stevenmeow/clawpeteer-agent/internal/security"
@@ -43,17 +44,32 @@ func main() {
 		tlsCfg := &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
+
+		var caCert []byte
+
 		if cfg.Broker.CAFile != "" {
-			caCert, err := os.ReadFile(cfg.Broker.CAFile)
+			// Priority 1: config file path
+			caCert, err = os.ReadFile(cfg.Broker.CAFile)
 			if err != nil {
 				log.Fatalf("Failed to read CA file: %v", err)
 			}
+			log.Println("Using CA certificate from config file")
+		} else if embedded := certs.LoadEmbeddedCA(); embedded != nil {
+			// Priority 2: embedded at build time
+			caCert = embedded
+			log.Println("Using embedded CA certificate")
+		}
+
+		if caCert != nil {
 			caCertPool := x509.NewCertPool()
 			if !caCertPool.AppendCertsFromPEM(caCert) {
 				log.Fatal("Failed to parse CA certificate")
 			}
 			tlsCfg.RootCAs = caCertPool
+		} else {
+			log.Println("No CA certificate provided, using system root CAs")
 		}
+
 		opts.SetTLSConfig(tlsCfg)
 	}
 
