@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="img/banner.png" alt="Clawpeteer Banner" width="100%">
+</p>
+
 # Clawpeteer - MQTT Remote Control for OpenClaw
 
 Clawpeteer is a remote control system that lets you execute commands, transfer files, and manage tasks on remote machines via MQTT. It consists of a Go-based agent that runs on target machines, a Node.js CLI for sending commands, and a Mosquitto MQTT broker that handles secure communication between them. Designed as an OpenClaw skill, Clawpeteer enables AI agents to operate across multiple computers through natural language intent mapping.
