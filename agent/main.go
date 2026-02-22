@@ -14,12 +14,12 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
-	"github.com/stevenmeow/clawpeteer-agent/buildcfg"
-	"github.com/stevenmeow/clawpeteer-agent/certs"
-	"github.com/stevenmeow/clawpeteer-agent/internal/config"
-	"github.com/stevenmeow/clawpeteer-agent/internal/handler"
-	"github.com/stevenmeow/clawpeteer-agent/internal/security"
-	"github.com/stevenmeow/clawpeteer-agent/internal/taskmanager"
+	"github.com/stevenyu113228/Clawpeteer/agent/buildcfg"
+	"github.com/stevenyu113228/Clawpeteer/agent/certs"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/config"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/handler"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/security"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/taskmanager"
 )
 
 func main() {

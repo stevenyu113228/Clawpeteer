@@ -13,10 +13,10 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/stevenmeow/clawpeteer-agent/internal/executor"
-	"github.com/stevenmeow/clawpeteer-agent/internal/filetransfer"
-	"github.com/stevenmeow/clawpeteer-agent/internal/security"
-	"github.com/stevenmeow/clawpeteer-agent/internal/taskmanager"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/executor"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/filetransfer"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/security"
+	"github.com/stevenyu113228/Clawpeteer/agent/internal/taskmanager"
 )
 
 // Command represents an incoming command message from the server.

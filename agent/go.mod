@@ -1,4 +1,4 @@
-module github.com/stevenmeow/clawpeteer-agent
+module github.com/stevenyu113228/Clawpeteer/agent
 
 go 1.24.0
 
