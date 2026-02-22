@@ -1,0 +1,14 @@
+[Unit]
+Description=Clawpeteer MQTT Remote Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/clawpeteer-agent --config /etc/clawpeteer/config.json
+Restart=always
+RestartSec=10
+User=clawpeteer
+
+[Install]
+WantedBy=multi-user.target
