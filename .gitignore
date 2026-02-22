@@ -1,5 +1,6 @@
 node_modules/
 dist/
+build/
 *.exe
 .env
 config.json
@@ -7,6 +8,9 @@ cli/config.json
 agent/config.json
 *.log
 .DS_Store
+
+# Compiled agent binary
+agent/clawpeteer-agent
 
 # Embedded CA certs (sensitive, don't commit)
 agent/certs/*.crt

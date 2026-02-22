@@ -29,6 +29,26 @@ Clawpeteer is a remote control system that lets you execute commands, transfer f
 
 ## Quick Start
 
+### One-Line Deploy (OpenClaw machines)
+
+Package everything into a zip and deploy to any machine with OpenClaw installed:
+
+```bash
+# Build the installer package
+./pack-installer.sh
+
+# Deploy to target machine
+scp build/clawpeteer-install.zip user@host:~/
+ssh user@host 'unzip clawpeteer-install.zip && cd clawpeteer-install && ./install.sh \
+  --broker-url mqtts://your.broker.host:8883 \
+  --username my-agent \
+  --password my-secret'
+```
+
+The installer automatically sets up the CLI, MQTT config, CA certificate, and OpenClaw skill.
+
+### Manual Setup
+
 1. **Set up the MQTT broker** (see [docs/setup-broker.md](docs/setup-broker.md)):
    ```bash
    cd broker && sudo ./setup.sh
@@ -42,9 +62,10 @@ Clawpeteer is a remote control system that lets you execute commands, transfer f
 3. **Configure the CLI** (create `~/.clawpeteer/config.json`):
    ```json
    {
-     "brokerUrl": "mqtt://localhost:1883",
-     "username": "openclaw",
-     "password": "your-password"
+     "brokerUrl": "mqtts://your.broker.host:8883",
+     "username": "my-agent",
+     "password": "my-secret",
+     "caFile": "/path/to/ca.crt"
    }
    ```
 
@@ -73,6 +94,7 @@ Clawpeteer is a remote control system that lets you execute commands, transfer f
 ```
 clawpeteer/
   agent/              Go agent (runs on remote machines)
+    certs/              embedded CA certificate (build-time)
     internal/           config, executor, filetransfer, handler, security, taskmanager
     scripts/            install-linux.sh, install-mac.sh
     systemd/            clawpeteer-agent.service
@@ -84,9 +106,11 @@ clawpeteer/
   cli/                Node.js CLI
     bin/                clawpeteer.js entry point
     src/                commands (send, list, status, kill, upload, download) + mqtt client
+  install/            Installer script for one-line deployment
   docs/               Documentation
   skill/              OpenClaw SKILL.md
   test/               Integration tests
+  pack-installer.sh   Build installer zip package
 ```
 
 ## License
