@@ -4,6 +4,7 @@ import { registerSendCommand } from '../src/commands/send.js';
 import { registerListCommand } from '../src/commands/list.js';
 import { registerStatusCommand } from '../src/commands/status.js';
 import { registerKillCommand } from '../src/commands/kill.js';
+import { registerUploadCommand } from '../src/commands/upload.js';
 
 program
   .name('clawpeteer')
@@ -14,5 +15,6 @@ registerSendCommand(program);
 registerListCommand(program);
 registerStatusCommand(program);
 registerKillCommand(program);
+registerUploadCommand(program);
 
 program.parse();
