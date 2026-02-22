@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.exe
+.env
+config.json
+cli/config.json
+agent/config.json
+*.log
+.DS_Store
