@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/stevenmeow/clawpeteer-agent/internal/executor"
+	"github.com/stevenmeow/clawpeteer-agent/internal/filetransfer"
 	"github.com/stevenmeow/clawpeteer-agent/internal/security"
 	"github.com/stevenmeow/clawpeteer-agent/internal/taskmanager"
 )
@@ -70,40 +72,99 @@ type ControlCommand struct {
 	Signal string `json:"signal,omitempty"`
 }
 
-// Handler orchestrates command execution, streaming, and heartbeat.
+// FileStatusMessage represents a file transfer status update.
+type FileStatusMessage struct {
+	TransferID     string  `json:"transferId"`
+	Direction      string  `json:"direction"`
+	Status         string  `json:"status"`
+	ReceivedChunks int     `json:"receivedChunks,omitempty"`
+	TotalChunks    int     `json:"totalChunks,omitempty"`
+	Progress       float64 `json:"progress,omitempty"`
+	Verified       bool    `json:"verified,omitempty"`
+	Error          string  `json:"error,omitempty"`
+	Timestamp      int64   `json:"timestamp"`
+}
+
+// UploadMeta represents incoming file upload metadata.
+type UploadMeta struct {
+	TransferID string `json:"transferId"`
+	Filename   string `json:"filename"`
+	DestPath   string `json:"destPath"`
+	Size       int64  `json:"size"`
+	TotalChunks int   `json:"totalChunks"`
+	Sha256     string `json:"sha256"`
+}
+
+// UploadChunk represents an incoming file chunk.
+type UploadChunk struct {
+	TransferID string `json:"transferId"`
+	Index      int    `json:"index"`
+	Data       string `json:"data"`
+}
+
+// DownloadChunkMessage represents an outgoing download chunk.
+type DownloadChunkMessage struct {
+	TransferID string `json:"transferId"`
+	Index      int    `json:"index"`
+	Data       string `json:"data"`
+}
+
+// DownloadMetaMessage represents outgoing download metadata.
+type DownloadMetaMessage struct {
+	TransferID  string `json:"transferId"`
+	Filename    string `json:"filename"`
+	Size        int64  `json:"size"`
+	TotalChunks int    `json:"totalChunks"`
+	Sha256      string `json:"sha256"`
+	ChunkSize   int    `json:"chunkSize"`
+}
+
+// Handler orchestrates command execution, streaming, file transfer, and heartbeat.
 type Handler struct {
-	agentID   string
-	client    mqtt.Client
-	tasks     *taskmanager.Manager
-	security  *security.Validator
-	processes map[string]*executor.Process
-	mu        sync.Mutex
-	startTime time.Time
-	stopHB    chan struct{}
+	agentID      string
+	client       mqtt.Client
+	tasks        *taskmanager.Manager
+	security     *security.Validator
+	fileReceiver *filetransfer.Receiver
+	processes    map[string]*executor.Process
+	mu           sync.Mutex
+	startTime    time.Time
+	stopHB       chan struct{}
 }
 
 // New creates a new Handler.
 func New(agentID string, client mqtt.Client, tasks *taskmanager.Manager, sec *security.Validator) *Handler {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "/tmp"
+	}
+	baseDir := filepath.Join(homeDir, ".clawpeteer")
+
 	return &Handler{
-		agentID:   agentID,
-		client:    client,
-		tasks:     tasks,
-		security:  sec,
-		processes: make(map[string]*executor.Process),
-		startTime: time.Now(),
-		stopHB:    make(chan struct{}),
+		agentID:      agentID,
+		client:       client,
+		tasks:        tasks,
+		security:     sec,
+		fileReceiver: filetransfer.NewReceiver(baseDir),
+		processes:    make(map[string]*executor.Process),
+		startTime:    time.Now(),
+		stopHB:       make(chan struct{}),
 	}
 }
 
-// Subscribe subscribes to the command and control topics.
+// Subscribe subscribes to the command, control, and file transfer topics.
 func (h *Handler) Subscribe() {
 	commandTopic := fmt.Sprintf("agents/%s/commands", h.agentID)
 	controlTopic := fmt.Sprintf("agents/%s/control/+", h.agentID)
+	uploadMetaTopic := fmt.Sprintf("agents/%s/files/upload/+/meta", h.agentID)
+	uploadChunkTopic := fmt.Sprintf("agents/%s/files/upload/+/chunks", h.agentID)
 
 	h.client.Subscribe(commandTopic, 1, h.handleCommand)
 	h.client.Subscribe(controlTopic, 1, h.handleControl)
+	h.client.Subscribe(uploadMetaTopic, 1, h.handleUploadMeta)
+	h.client.Subscribe(uploadChunkTopic, 1, h.handleUploadChunk)
 
-	log.Printf("Subscribed to %s and %s", commandTopic, controlTopic)
+	log.Printf("Subscribed to commands, control, and file transfer topics")
 
 	h.publishRegistry()
 }
@@ -436,13 +497,211 @@ func (h *Handler) sendHeartbeat() {
 	h.client.Publish(topic, 1, true, data)
 }
 
-// handleDownload is a placeholder for file download handling.
-// It will be fully implemented when file transfer is wired in (Task 9).
-func (h *Handler) handleDownload(cmd Command) {
-	h.publishResult(ResultMessage{
-		TaskID:    cmd.ID,
-		Status:    "error",
-		Error:     "file download not yet implemented",
-		Timestamp: time.Now().UnixMilli(),
+// handleUploadMeta handles incoming file upload metadata messages.
+func (h *Handler) handleUploadMeta(client mqtt.Client, msg mqtt.Message) {
+	var meta UploadMeta
+	if err := json.Unmarshal(msg.Payload(), &meta); err != nil {
+		log.Printf("Failed to parse upload meta: %v", err)
+		return
+	}
+
+	log.Printf("Upload meta: transferId=%s filename=%s destPath=%s", meta.TransferID, meta.Filename, meta.DestPath)
+
+	// Validate upload path with security
+	if err := h.security.ValidateUploadPath(meta.DestPath); err != nil {
+		h.publishFileStatus(FileStatusMessage{
+			TransferID: meta.TransferID,
+			Direction:  "upload",
+			Status:     "error",
+			Error:      fmt.Sprintf("security: %v", err),
+			Timestamp:  time.Now().UnixMilli(),
+		})
+		return
+	}
+
+	// Initialize transfer in receiver
+	if err := h.fileReceiver.InitTransfer(meta.TransferID, meta.Filename, meta.DestPath, meta.Size, meta.TotalChunks, meta.Sha256); err != nil {
+		h.publishFileStatus(FileStatusMessage{
+			TransferID: meta.TransferID,
+			Direction:  "upload",
+			Status:     "error",
+			Error:      fmt.Sprintf("init: %v", err),
+			Timestamp:  time.Now().UnixMilli(),
+		})
+		return
+	}
+
+	h.publishFileStatus(FileStatusMessage{
+		TransferID:  meta.TransferID,
+		Direction:   "upload",
+		Status:      "receiving",
+		TotalChunks: meta.TotalChunks,
+		Timestamp:   time.Now().UnixMilli(),
 	})
+}
+
+// handleUploadChunk handles incoming file chunk messages.
+func (h *Handler) handleUploadChunk(client mqtt.Client, msg mqtt.Message) {
+	var chunk UploadChunk
+	if err := json.Unmarshal(msg.Payload(), &chunk); err != nil {
+		log.Printf("Failed to parse upload chunk: %v", err)
+		return
+	}
+
+	if err := h.fileReceiver.ReceiveChunk(chunk.TransferID, chunk.Index, chunk.Data); err != nil {
+		log.Printf("ReceiveChunk error: %v", err)
+		h.publishFileStatus(FileStatusMessage{
+			TransferID: chunk.TransferID,
+			Direction:  "upload",
+			Status:     "error",
+			Error:      fmt.Sprintf("chunk %d: %v", chunk.Index, err),
+			Timestamp:  time.Now().UnixMilli(),
+		})
+		return
+	}
+
+	received, total, ok := h.fileReceiver.Progress(chunk.TransferID)
+	if !ok {
+		return
+	}
+
+	// Publish progress every 10%
+	progress := float64(received) / float64(total) * 100
+	progressStep := 100.0 / float64(total)
+	if progressStep < 10 {
+		progressStep = 10
+	}
+	// Report at every 10% boundary or when complete
+	if int(progress)%10 == 0 || received == total {
+		h.publishFileStatus(FileStatusMessage{
+			TransferID:     chunk.TransferID,
+			Direction:      "upload",
+			Status:         "receiving",
+			ReceivedChunks: received,
+			TotalChunks:    total,
+			Progress:       progress,
+			Timestamp:      time.Now().UnixMilli(),
+		})
+	}
+
+	// If all chunks received, finalize
+	if received == total {
+		verified, err := h.fileReceiver.Finalize(chunk.TransferID)
+		if err != nil {
+			h.publishFileStatus(FileStatusMessage{
+				TransferID: chunk.TransferID,
+				Direction:  "upload",
+				Status:     "error",
+				Error:      fmt.Sprintf("finalize: %v", err),
+				Timestamp:  time.Now().UnixMilli(),
+			})
+			return
+		}
+
+		h.publishFileStatus(FileStatusMessage{
+			TransferID:     chunk.TransferID,
+			Direction:      "upload",
+			Status:         "completed",
+			ReceivedChunks: total,
+			TotalChunks:    total,
+			Progress:       100,
+			Verified:       verified,
+			Timestamp:      time.Now().UnixMilli(),
+		})
+	}
+}
+
+// handleDownload handles file download commands.
+func (h *Handler) handleDownload(cmd Command) {
+	// Validate download path
+	if err := h.security.ValidateDownloadPath(cmd.SourcePath); err != nil {
+		h.publishResult(ResultMessage{
+			TaskID:    cmd.ID,
+			Status:    "error",
+			Error:     fmt.Sprintf("security: %v", err),
+			Timestamp: time.Now().UnixMilli(),
+		})
+		return
+	}
+
+	const chunkSize = 64 * 1024 // 64KB chunks
+
+	// Prepare download metadata
+	meta, err := filetransfer.PrepareDownload(cmd.SourcePath, chunkSize)
+	if err != nil {
+		h.publishResult(ResultMessage{
+			TaskID:    cmd.ID,
+			Status:    "error",
+			Error:     fmt.Sprintf("prepare download: %v", err),
+			Timestamp: time.Now().UnixMilli(),
+		})
+		return
+	}
+
+	transferID := cmd.TransferID
+	if transferID == "" {
+		transferID = cmd.ID
+	}
+
+	// Publish metadata
+	metaTopic := fmt.Sprintf("agents/%s/files/download/%s/meta", h.agentID, transferID)
+	metaMsg := DownloadMetaMessage{
+		TransferID:  transferID,
+		Filename:    meta.Filename,
+		Size:        meta.Size,
+		TotalChunks: meta.TotalChunks,
+		Sha256:      meta.Sha256,
+		ChunkSize:   chunkSize,
+	}
+	metaData, _ := json.Marshal(metaMsg)
+	h.client.Publish(metaTopic, 1, false, metaData)
+
+	// Send all chunks
+	chunkTopic := fmt.Sprintf("agents/%s/files/download/%s/chunks", h.agentID, transferID)
+	for i := 0; i < meta.TotalChunks; i++ {
+		encoded, err := filetransfer.ReadChunk(cmd.SourcePath, i, chunkSize)
+		if err != nil {
+			log.Printf("ReadChunk(%d) error: %v", i, err)
+			h.publishFileStatus(FileStatusMessage{
+				TransferID: transferID,
+				Direction:  "download",
+				Status:     "error",
+				Error:      fmt.Sprintf("read chunk %d: %v", i, err),
+				Timestamp:  time.Now().UnixMilli(),
+			})
+			return
+		}
+
+		chunkMsg := DownloadChunkMessage{
+			TransferID: transferID,
+			Index:      i,
+			Data:       encoded,
+		}
+		chunkData, _ := json.Marshal(chunkMsg)
+		h.client.Publish(chunkTopic, 0, false, chunkData)
+	}
+
+	// Publish completed status
+	h.publishFileStatus(FileStatusMessage{
+		TransferID:     transferID,
+		Direction:      "download",
+		Status:         "completed",
+		ReceivedChunks: meta.TotalChunks,
+		TotalChunks:    meta.TotalChunks,
+		Progress:       100,
+		Verified:       true,
+		Timestamp:      time.Now().UnixMilli(),
+	})
+}
+
+// publishFileStatus publishes a file transfer status message.
+func (h *Handler) publishFileStatus(status FileStatusMessage) {
+	data, err := json.Marshal(status)
+	if err != nil {
+		log.Printf("Failed to marshal file status: %v", err)
+		return
+	}
+
+	topic := fmt.Sprintf("agents/%s/files/status", h.agentID)
+	h.client.Publish(topic, 1, false, data)
 }
