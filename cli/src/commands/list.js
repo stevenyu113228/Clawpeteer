@@ -17,13 +17,19 @@ export function registerListCommand(program) {
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 
-        const agents = new Map();
+        const agents = new Map();   // id -> { hb, receivedAt, liveCount }
         const waitMs = parseInt(opts.wait, 10) * 1000;
 
         mqtt.on('message', (topic, msg) => {
           const match = topic.match(/^agents\/([^/]+)\/heartbeat$/);
           if (match) {
-            agents.set(match[1], msg);
+            const id = match[1];
+            const prev = agents.get(id);
+            agents.set(id, {
+              hb: msg,
+              receivedAt: Date.now(),
+              liveCount: (prev ? prev.liveCount : 0) + 1,
+            });
           }
         });
 
@@ -37,12 +43,23 @@ export function registerListCommand(program) {
           return;
         }
 
-        // Determine online/offline based on heartbeat timestamp
+        // Determine online/offline
+        // liveCount > 1 means we received a fresh heartbeat during wait (not just retained)
+        // Otherwise fall back to agent timestamp (may have clock skew)
         const now = Date.now();
         const entries = [];
-        for (const [id, hb] of agents) {
-          const age = hb.timestamp ? now - hb.timestamp : Infinity;
-          const isOnline = age < STALE_THRESHOLD_MS;
+        for (const [id, { hb, receivedAt, liveCount }] of agents) {
+          let isOnline;
+          let age;
+          if (liveCount > 1) {
+            // Received multiple heartbeats — definitely alive
+            isOnline = true;
+            age = now - receivedAt;
+          } else {
+            // Only got retained message — use agent's timestamp
+            age = hb.timestamp ? now - hb.timestamp : Infinity;
+            isOnline = age < STALE_THRESHOLD_MS;
+          }
           entries.push({ id, hb, isOnline, age });
         }
 
