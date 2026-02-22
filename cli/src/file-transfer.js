@@ -1,7 +1,7 @@
-import { createReadStream, statSync } from 'fs';
+import { createReadStream, statSync, writeFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
-import { basename } from 'path';
+import { basename, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 export const CHUNK_SIZE = 256 * 1024; // 256 KB
@@ -93,4 +93,123 @@ export async function uploadFile(mqtt, agentId, localPath, remotePath, onProgres
   );
 
   return result;
+}
+
+/**
+ * Download a file from a remote agent via MQTT chunked transfer.
+ * @param {import('./mqtt-client.js').MQTTClient} mqtt
+ * @param {string} agentId
+ * @param {string} remotePath
+ * @param {string} localPath
+ * @param {function} onProgress - callback(receivedChunks, totalChunks)
+ * @returns {Promise<object>} result with localPath and verified flag
+ */
+export async function downloadFile(mqtt, agentId, remotePath, localPath, onProgress) {
+  const transferId = uuidv4();
+
+  // Subscribe to download topics
+  await mqtt.subscribe(`agents/${agentId}/files/download/+/meta`);
+  await mqtt.subscribe(`agents/${agentId}/files/download/+/chunks`);
+
+  let meta = null;
+  const chunks = new Map();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Download timed out after 120 seconds'));
+    }, 120000);
+
+    const handler = (topic, msg) => {
+      // Match meta message
+      const metaMatch = topic.match(/^agents\/[^/]+\/files\/download\/([^/]+)\/meta$/);
+      if (metaMatch && msg.transferId) {
+        meta = msg;
+        if (onProgress) {
+          onProgress(0, meta.totalChunks);
+        }
+        return;
+      }
+
+      // Match chunk message
+      const chunkMatch = topic.match(/^agents\/[^/]+\/files\/download\/([^/]+)\/chunks$/);
+      if (chunkMatch && msg.transferId && meta && msg.transferId === meta.transferId) {
+        chunks.set(msg.index, msg.data);
+
+        if (onProgress) {
+          onProgress(chunks.size, meta.totalChunks);
+        }
+
+        // Check if all chunks received
+        if (chunks.size === meta.totalChunks) {
+          clearTimeout(timeout);
+          mqtt.removeListener('message', handler);
+          assembleFile();
+        }
+      }
+    };
+
+    function assembleFile() {
+      try {
+        // Assemble chunks in order
+        const buffers = [];
+        for (let i = 0; i < meta.totalChunks; i++) {
+          const chunkData = chunks.get(i);
+          if (!chunkData) {
+            reject(new Error(`Missing chunk ${i}`));
+            return;
+          }
+          buffers.push(Buffer.from(chunkData, 'base64'));
+        }
+
+        const fileBuffer = Buffer.concat(buffers);
+
+        // Determine output path
+        let outputPath = localPath;
+        if (!outputPath) {
+          outputPath = join(process.cwd(), meta.fileName || basename(remotePath));
+        }
+
+        // Write file
+        writeFileSync(outputPath, fileBuffer);
+
+        // Verify SHA-256
+        let verified = false;
+        if (meta.sha256) {
+          const hash = createHash('sha256').update(fileBuffer).digest('hex');
+          verified = hash === meta.sha256;
+        }
+
+        resolve({
+          status: 'completed',
+          localPath: outputPath,
+          fileSize: fileBuffer.length,
+          verified,
+        });
+      } catch (err) {
+        reject(err);
+      }
+    }
+
+    function cleanup() {
+      clearTimeout(timeout);
+      mqtt.removeListener('message', handler);
+    }
+
+    mqtt.on('message', handler);
+
+    // Send file download command to agent
+    const downloadCommand = {
+      id: transferId,
+      type: 'file_download',
+      remotePath,
+      transferId,
+      timestamp: Date.now(),
+    };
+
+    mqtt.publish(`agents/${agentId}/commands`, downloadCommand).catch((err) => {
+      cleanup();
+      reject(err);
+    });
+  });
 }

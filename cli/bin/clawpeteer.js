@@ -5,6 +5,7 @@ import { registerListCommand } from '../src/commands/list.js';
 import { registerStatusCommand } from '../src/commands/status.js';
 import { registerKillCommand } from '../src/commands/kill.js';
 import { registerUploadCommand } from '../src/commands/upload.js';
+import { registerDownloadCommand } from '../src/commands/download.js';
 
 program
   .name('clawpeteer')
@@ -16,5 +17,6 @@ registerListCommand(program);
 registerStatusCommand(program);
 registerKillCommand(program);
 registerUploadCommand(program);
+registerDownloadCommand(program);
 
 program.parse();
