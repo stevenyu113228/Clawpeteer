@@ -1,0 +1,19 @@
+{
+  "agentId": "home-pc",
+  "broker": {
+    "url": "mqtts://mqtt.yourdomain.com:8883",
+    "username": "home-pc",
+    "password": "your-secure-password",
+    "caFile": "/path/to/ca.crt"
+  },
+  "security": {
+    "mode": "blacklist",
+    "blacklist": ["rm -rf /", "mkfs", "dd if=/dev/zero", "chmod -R 777 /"],
+    "uploadDirs": ["/home/user/uploads", "/tmp/mqtt-uploads"],
+    "downloadDirs": ["/home/user", "/var/log"],
+    "maxFileSize": 1073741824,
+    "maxConcurrentTransfers": 3
+  },
+  "heartbeatInterval": 30,
+  "logDir": "~/.clawpeteer/logs"
+}
