@@ -10,11 +10,10 @@ export function registerDownloadCommand(program) {
     .argument('<agent>', 'Agent ID')
     .argument('<remotePath>', 'File path on the remote agent')
     .argument('[localPath]', 'Local destination path (default: current directory)')
-    .option('-c, --config <path>', 'Path to config file')
-    .action(async (agent, remotePath, localPath, opts) => {
+    .action(async (agent, remotePath, localPath, opts, cmd) => {
       let mqtt;
       try {
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

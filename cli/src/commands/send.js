@@ -12,11 +12,10 @@ export function registerSendCommand(program) {
     .option('-s, --stream', 'Stream stdout/stderr in real time', false)
     .option('-b, --background', 'Run command in background on agent', false)
     .option('-t, --timeout <ms>', 'Command timeout in milliseconds', '30000')
-    .option('-c, --config <path>', 'Path to config file')
-    .action(async (agent, command, opts) => {
+    .action(async (agent, command, opts, cmd) => {
       let mqtt;
       try {
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

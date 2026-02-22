@@ -6,12 +6,11 @@ export function registerListCommand(program) {
   program
     .command('list')
     .description('List all online agents')
-    .option('-c, --config <path>', 'Path to config file')
     .option('-w, --wait <seconds>', 'Seconds to wait for heartbeats', '3')
-    .action(async (opts) => {
+    .action(async (opts, cmd) => {
       let mqtt;
       try {
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

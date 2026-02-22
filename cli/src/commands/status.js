@@ -8,12 +8,11 @@ export function registerStatusCommand(program) {
     .description('Query task status on a remote agent')
     .argument('<agent>', 'Agent ID to query')
     .argument('[taskId]', 'Specific task ID to query')
-    .option('-c, --config <path>', 'Path to config file')
     .option('-t, --timeout <ms>', 'Timeout in milliseconds', '10000')
-    .action(async (agent, taskId, opts) => {
+    .action(async (agent, taskId, opts, cmd) => {
       let mqtt;
       try {
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

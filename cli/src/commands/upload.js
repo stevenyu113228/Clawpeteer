@@ -11,8 +11,7 @@ export function registerUploadCommand(program) {
     .argument('<agent>', 'Agent ID')
     .argument('<localPath>', 'Local file path to upload')
     .argument('<remotePath>', 'Destination path on the agent')
-    .option('-c, --config <path>', 'Path to config file')
-    .action(async (agent, localPath, remotePath, opts) => {
+    .action(async (agent, localPath, remotePath, opts, cmd) => {
       let mqtt;
       try {
         // Validate local file exists
@@ -27,7 +26,7 @@ export function registerUploadCommand(program) {
           process.exit(1);
         }
 
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

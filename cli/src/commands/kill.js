@@ -9,12 +9,11 @@ export function registerKillCommand(program) {
     .argument('<agent>', 'Agent ID')
     .argument('<taskId>', 'Task ID to kill')
     .option('-s, --signal <signal>', 'Signal to send', 'SIGTERM')
-    .option('-c, --config <path>', 'Path to config file')
     .option('-t, --timeout <ms>', 'Timeout in milliseconds', '10000')
-    .action(async (agent, taskId, opts) => {
+    .action(async (agent, taskId, opts, cmd) => {
       let mqtt;
       try {
-        const config = loadConfig(opts.config);
+        const config = loadConfig(cmd.optsWithGlobals().config);
         mqtt = new MQTTClient(config);
         await mqtt.connect();
 

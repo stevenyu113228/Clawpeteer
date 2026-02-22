@@ -10,7 +10,10 @@ import { registerDownloadCommand } from '../src/commands/download.js';
 program
   .name('clawpeteer')
   .description('MQTT remote control CLI for OpenClaw')
-  .version('1.0.0');
+  .version('1.0.0')
+  .option('-c, --config <path>', 'Path to config file')
+  .enablePositionalOptions()
+  .passThroughOptions();
 
 registerSendCommand(program);
 registerListCommand(program);
