@@ -1,0 +1,16 @@
+# OpenClaw controller - full access to all agent topics
+user openclaw
+topic readwrite agents/#
+
+# Pattern-based ACL for agents
+# Each agent can only access its own topics
+pattern read agents/%u/commands
+pattern read agents/%u/control/#
+pattern write agents/%u/results
+pattern write agents/%u/stream/#
+pattern write agents/%u/heartbeat
+pattern read agents/%u/files/upload/#
+pattern write agents/%u/files/download/#
+pattern write agents/%u/files/status
+pattern write agents/registry
+pattern read agents/broadcast
