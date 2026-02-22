@@ -9,8 +9,9 @@ agent/config.json
 *.log
 .DS_Store
 
-# Compiled agent binary
+# Compiled agent binaries
 agent/clawpeteer-agent
+agent/clawpeteer-agent-*
 
 # Embedded CA certs (sensitive, don't commit)
 agent/certs/*.crt
