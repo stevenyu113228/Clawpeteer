@@ -1,0 +1,6 @@
+{
+  "brokerUrl": "mqtt://localhost:1883",
+  "username": "openclaw",
+  "password": "your-password",
+  "caFile": ""
+}
