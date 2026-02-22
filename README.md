@@ -69,10 +69,10 @@ The installer automatically sets up the CLI, MQTT config, CA certificate, and Op
    }
    ```
 
-4. **Install an agent on a remote machine** (see [docs/install-agent.md](docs/install-agent.md)):
+4. **Build and run an agent on a remote machine** (see [docs/install-agent.md](docs/install-agent.md)):
    ```bash
-   cd agent && make build
-   ./agent/scripts/install-linux.sh   # or install-mac.sh
+   cd agent && go build -o clawpeteer-agent .
+   ./clawpeteer-agent --id home-pc --broker mqtts://your.broker.host:8883 --user home-pc --pass my-secret
    ```
 
 5. **Start using it**:
@@ -82,6 +82,52 @@ The installer automatically sets up the CLI, MQTT config, CA certificate, and Op
    clawpeteer upload home-pc ./f.txt /tmp/   # upload a file
    clawpeteer download home-pc /var/log/syslog ./logs/  # download a file
    ```
+
+## Agent Configuration
+
+The agent supports three ways to configure, with the following priority (highest first):
+
+| Priority | Method | Description |
+|----------|--------|-------------|
+| 1 | CLI flags | `--id`, `--broker`, `--user`, `--pass`, `--ca` |
+| 2 | Config file | `--config path/to/config.json` |
+| 3 | Embedded config | Baked into binary at build time |
+| 4 | `./config.json` | Config file in current directory |
+
+### CLI Flags
+
+```bash
+clawpeteer-agent \
+  --id home-pc \
+  --broker mqtts://your.broker.host:8883 \
+  --user home-pc \
+  --pass my-secret \
+  --ca /path/to/ca.crt
+```
+
+### Zero-Config Build (embed everything)
+
+Embed both config and CA certificate into the binary for single-file deployment:
+
+```bash
+cp your-config.json agent/buildcfg/config.json
+cp your-ca.crt agent/certs/ca.crt
+cd agent && go build -o clawpeteer-agent .
+```
+
+The resulting binary runs with no external files:
+
+```bash
+./clawpeteer-agent                          # uses embedded config + CA
+./clawpeteer-agent --id override-name       # override specific fields
+```
+
+### Cross-compile for Windows
+
+```bash
+cd agent
+GOOS=windows GOARCH=amd64 go build -o clawpeteer-agent.exe .
+```
 
 ## Documentation
 
@@ -94,6 +140,7 @@ The installer automatically sets up the CLI, MQTT config, CA certificate, and Op
 ```
 clawpeteer/
   agent/              Go agent (runs on remote machines)
+    buildcfg/           embedded config.json (build-time)
     certs/              embedded CA certificate (build-time)
     internal/           config, executor, filetransfer, handler, security, taskmanager
     scripts/            install-linux.sh, install-mac.sh
