@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { program } from 'commander';
 import { registerSendCommand } from '../src/commands/send.js';
+import { registerListCommand } from '../src/commands/list.js';
+import { registerStatusCommand } from '../src/commands/status.js';
+import { registerKillCommand } from '../src/commands/kill.js';
 
 program
   .name('clawpeteer')
@@ -8,5 +11,8 @@ program
   .version('1.0.0');
 
 registerSendCommand(program);
+registerListCommand(program);
+registerStatusCommand(program);
+registerKillCommand(program);
 
 program.parse();
